@@ -47,7 +47,7 @@ typedef struct {
     int (*send)(const void *payload, size_t length);
 
     /**
-     * @brief Lee datos del canal mediante Polling activo (Bloqueante).
+     * @brief Lee datos del canal (Bloqueante).
      * @param buffer Puntero donde se almacenarán los datos recibidos.
      * @param max_length Capacidad máxima del buffer para evitar desbordamientos.
      * @param timeout_ms Tiempo máximo de espera en milisegundos antes de abortar.
