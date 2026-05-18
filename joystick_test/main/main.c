@@ -9,7 +9,7 @@
 #include "driver/gpio.h"
 
 #define ESP_NOW_CHANNEL 6
-#define ESP_NOW_FRECUENCY_MS 200
+#define ESP_NOW_FRECUENCY_MS 50
 
 static const char *TAG = "SENDER";
 
