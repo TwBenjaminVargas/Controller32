@@ -23,10 +23,6 @@ typedef int ui_eid_t;
  */
 typedef struct {
 
-    /* =========================================================================
-     * GESTIÓN Y CICLO DE VIDA DE LA UI
-     * ========================================================================= */
-
     /**
      * @brief Inicializa el hardware del display o la configuración de la consola.
      * @param optionalArgs Puntero genérico para pasar configuraciones físicas 
@@ -53,11 +49,6 @@ typedef struct {
      * @param eid Identificador único del elemento que se desea remover.
      */
     void (*deleteElement)(ui_eid_t eid);
-
-
-    /* =========================================================================
-     * COMPONENTES DE TEXTO
-     * ========================================================================= */
 
     /**
      * @brief Agrega un título principal destacado (normalmente centrado o en mayúsculas).
@@ -101,11 +92,6 @@ typedef struct {
      */
     void (*updateTextLine)(ui_eid_t eid, const char *text);
 
-
-    /* =========================================================================
-     * COMPONENTES GRÁFICOS / NUMÉRICOS
-     * ========================================================================= */
-
     /**
      * @brief Agrega una barra de progreso lineal tradicional (Rango de 0 a 100%).
      * @param title Etiqueta descriptiva que acompaña a la barra (ej: "Battery").
@@ -141,11 +127,6 @@ typedef struct {
      */
     void (*updateBipolarProgressBar)(ui_eid_t eid, int percentage, const char *value);
 
-
-    /* =========================================================================
-     *  COMPONENTES DE ESTADO BINARIO (ON/OFF)
-     * ========================================================================= */
-
     /**
      * @brief Agrega un indicador de estado booleano (ej: Conectado/Desconectado, Activo/Inactivo).
      * @param title Etiqueta descriptiva del estado (ej: "WiFi Status").
@@ -160,11 +141,6 @@ typedef struct {
      * @param state Nuevo estado booleano (true o false).
      */
     void (*updateStateIndicator)(ui_eid_t eid, bool state);
-
-
-    /* =========================================================================
-     * COMPONENTES DE ALERTA Y EMERGENCIAS
-     * ========================================================================= */
 
     /**
      * @brief Agrega un espacio reservado en el Layout exclusivo para alertas críticas.
