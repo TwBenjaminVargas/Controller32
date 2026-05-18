@@ -37,7 +37,6 @@ typedef struct {
      */
     bool (*isConnected)(void);
 
-    /* --- Transferencia de Datos Sincrónica / Bloqueante --- */
 
     /**
      * @brief Envía un bloque de datos crudo a través del canal activo.
@@ -56,7 +55,7 @@ typedef struct {
      */
     int (*receive)(void *buffer, size_t max_length, uint32_t timeout_ms);
 
-    /* --- Suscripción a Eventos Asincrónicos (Callbacks) --- */
+
 
     /**
      * @brief Registra una función de interrupción (Callback) para recepción asincrónica.
@@ -70,7 +69,7 @@ typedef struct {
      */
     void (*onSend)(void (*callback)(bool success));
 
-    /* --- Telemetría y Diagnóstico --- */
+
 
     /**
      * @brief Devuelve la calidad actual del enlace (RSSI mapeado o porcentaje de paquetes).
