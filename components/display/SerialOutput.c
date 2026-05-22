@@ -13,7 +13,9 @@
 #define ANSI_CYAN   "\033[36m"
 #define ANSI_RED    "\033[31m"
 #define ANSI_YELLOW "\033[33m"
-#define ANSI_CLEAR  "\033[2J\033[H"
+#define ANSI_CLEAR  "\033[2J\033[H"   
+#define ANSI_HOME   "\033[H"         
+#define ANSI_EOL    "\033[K"         
 
 #define MAX_ELEMENTS   32
 #define MAX_TEXT       64
@@ -127,49 +129,48 @@ static void render(element_t *e) {
 
         case TITLE:
             printf(ANSI_GREEN);
-            printf("\n================================================\n");
-            printf("%s\n", e->text);
-            printf("================================================\n");
+            printf("\n================================================" ANSI_EOL "\n");
+            printf("%s" ANSI_EOL "\n", e->text);
+            printf("================================================" ANSI_EOL "\n");
             printf(ANSI_RESET);
             break;
 
         case SUBTITLE:
-            printf(ANSI_CYAN "\n[ %s ]\n" ANSI_RESET, e->text);
+            printf(ANSI_CYAN "\n[ %s ]" ANSI_EOL "\n" ANSI_RESET, e->text);
             break;
 
         case TEXT:
-            printf(ANSI_YELLOW "%s\n" ANSI_RESET, e->text);
+            printf(ANSI_YELLOW "%s" ANSI_EOL "\n" ANSI_RESET, e->text);
             break;
 
         case BAR:
             printf("%-15s ", e->text);
             draw_bar(e->percentage);
-
-            printf(" %d%% (%s)\n",
-                   e->percentage,
-                   e->value);
+            printf(" %d%% (%s)" ANSI_EOL "\n", e->percentage, e->value);
             break;
 
         case BIPOLAR:
             printf("%-15s ", e->text);
             draw_bipolar(e->percentage);
-            printf(" %+d%%\n", e->percentage);
+            printf(" %+d%%" ANSI_EOL "\n", e->percentage);
             break;
 
         case STATE:
             if (e->state)
-                printf("[ON ] %s\n", e->text);
+                printf("[ON ] %s" ANSI_EOL "\n", e->text);
             else
-                printf("[OFF] %s\n", e->text);
+                printf("[OFF] %s" ANSI_EOL "\n", e->text);
             break;
 
         case ALERT:
             if (e->alert) {
                 printf(ANSI_RED);
-                printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-                printf("%s\n", e->text);
-                printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" ANSI_EOL "\n");
+                printf("%s" ANSI_EOL "\n", e->text);
+                printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" ANSI_EOL "\n");
                 printf(ANSI_RESET);
+            } else {
+                printf(ANSI_EOL "\n" ANSI_EOL "\n" ANSI_EOL "\n" ANSI_EOL "\n");
             }
             break;
     }
@@ -179,14 +180,14 @@ static void render(element_t *e) {
 static int impl_initUi(void *args) {
     (void)args;
     memset(elements, 0, sizeof(elements));
-    printf(ANSI_CLEAR);
+    printf(ANSI_CLEAR); 
 
     return 0;
 }
 
 static int impl_refreshUi(void) {
 
-    printf(ANSI_CLEAR);
+    printf(ANSI_HOME);
 
     for (int i = 0; i < MAX_ELEMENTS; i++) {
         if (elements[i].active) {
@@ -194,12 +195,13 @@ static int impl_refreshUi(void) {
         }
     }
 
+    fflush(stdout);
     return 0;
 }
 
 static void impl_cleanUi(void) {
     memset(elements, 0, sizeof(elements));
-    printf(ANSI_CLEAR);
+    printf(ANSI_CLEAR);  
 }
 
 static void impl_deleteElement(ui_eid_t eid) {
