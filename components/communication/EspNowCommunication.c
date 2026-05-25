@@ -29,8 +29,8 @@ static const char *TAG_ESPNOW = "COMM_ESPNOW";
 static atomic_bool is_initialized = ATOMIC_VAR_INIT(false);
 
 // Variable privada para el RSSI y su Mutex protector
-static int last_received_rssi = -120;
-static SemaphoreHandle_t rssi_mutex = NULL;
+//static int last_received_rssi = -120;
+static atomic_int last_received_rssi = ATOMIC_VAR_INIT(-120);
 
 
 typedef struct {
@@ -54,11 +54,7 @@ static portMUX_TYPE callback_mux = portMUX_INITIALIZER_UNLOCKED;
 static void native_now_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
     if (!atomic_load(&is_initialized)) return;
     if (recv_info != NULL && recv_info->rx_ctrl != NULL) {
-        // Protegemos la escritura de la variable global
-        if (rssi_mutex != NULL && xSemaphoreTake(rssi_mutex, pdMS_TO_TICKS(0)) == pdTRUE) {
-            last_received_rssi = recv_info->rx_ctrl->rssi;
-            xSemaphoreGive(rssi_mutex); // Soltamos el candado de inmediato
-        }
+        atomic_store(&last_received_rssi, recv_info->rx_ctrl->rssi)
     }
     // Encolar O disparar callback (Exclusión mutua)
     if (data != NULL && len > 0) {
@@ -127,12 +123,6 @@ static int espnow_impl_init(void *args) {
         return -1;
     }
 
-    // Creación del Mutex para RSSI (Heap)
-    rssi_mutex = xSemaphoreCreateMutex();
-    if (rssi_mutex == NULL) {
-        ESP_LOGE(TAG_ESPNOW, "No se pudo crear el mutex RSSI.");
-        goto err_clean_queue; // rollback: destruir cola
-    }
     
     // Inicializar la memoria no volátil (NVS)
     esp_err_t ret = nvs_flash_init();
@@ -142,14 +132,14 @@ static int espnow_impl_init(void *args) {
     }
     if (ret != ESP_OK) {
         ESP_LOGE(TAG_ESPNOW, "Fallo crítico al inicializar NVS Flash.");
-        goto err_clean_mutex; // rollback
+        goto err_clean_queue; // rollback
     }
 
     // Verificar Netif
     ret = esp_netif_init();
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
         ESP_LOGE(TAG_ESPNOW, "Fallo en esp_netif_init(): %s", esp_err_to_name(ret));
-        goto err_clean_mutex;
+        goto err_clean_queue;
     }
 
     // Verificar Event Loop preexistente
@@ -206,11 +196,6 @@ static int espnow_impl_init(void *args) {
     err_clean_netif:
         esp_netif_deinit();
 
-    err_clean_mutex:
-        if (rssi_mutex != NULL) {
-            vSemaphoreDelete(rssi_mutex);
-            rssi_mutex = NULL;
-        }
 
     err_clean_queue:
         if (rx_packet_queue != NULL) {
@@ -278,18 +263,12 @@ static void espnow_impl_disconnect(void) {
     rx_packet_queue = NULL;
     taskEXIT_CRITICAL(&callback_mux);
 
-    // Liberación de memoria en el Heap (Mutex y Queue)
-    if (rssi_mutex != NULL) {
-        vSemaphoreDelete(rssi_mutex);
-        rssi_mutex = NULL;
-    }
-
     if (queue_to_delete != NULL) {
         vQueueDelete(queue_to_delete);
     }
 
     // Resetear el estado de la telemetría
-    last_received_rssi = -120;
+    atomic_store(&last_received_rssi, -120);
     
     ESP_LOGW(TAG_ESPNOW, "Módulo desinicializado por completo. Memoria RAM liberada.");
 }
@@ -359,14 +338,9 @@ static int espnow_impl_comunicationQuality(void) {
         return 0;
     }
 
-    int rssi = -120; // Valor de respaldo seguro por si falla el Mutex
+    int rssi = -120; // Valor de respaldo seguro
 
-    // Intentamos tomar el Mutex para leer la variable de forma segura
-    if (rssi_mutex != NULL && xSemaphoreTake(rssi_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-        // Los valores de RSSI en Wi-Fi suelen moverse entre -30 dBm (pegado al emisor) y -95 dBm (al borde de perder el paquete)
-        rssi = last_received_rssi;
-        xSemaphoreGive(rssi_mutex);
-    }
+    rssi = atomic_load(&last_received_rssi);
 
     if (rssi <= RSSI_MIN) return 0;
     if (rssi >= RSSI_MAX) return 100;
