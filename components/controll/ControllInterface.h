@@ -14,7 +14,6 @@
  */
 typedef struct {
     int          cid;       // Canal identificado (ID único)
-    const void   *data;     // Datos genéricos del periférico
     size_t       length;    // Tamaño en bytes del payload recibido
 } ControllEvent;
 
@@ -45,8 +44,9 @@ typedef struct {
     /**
      * @brief Bloquea de forma eficiente (0% CPU) la tarea hasta recibir datos.
      * @param event Puntero donde se volcará el último evento de la cola.
+     * @param buffer Puntero al buffer donde se almacenarán los datos del evento.
      * @param timeout_ms Tiempo en milisegundos (0 para esperar indefinidamente).
      * @return true si se obtuvo un evento válido, false si ocurrió un timeout.
      */
-    bool (*waitEvent)(ControllEvent *event, uint32_t timeout_ms);
+    bool (*waitEvent)(ControllEvent *event,void* buffer,uint32_t timeout_ms);
 } ControllModule;
