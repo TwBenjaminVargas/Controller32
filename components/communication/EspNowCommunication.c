@@ -44,8 +44,6 @@ static QueueHandle_t rx_packet_queue = NULL;
 static void (*private_on_receive_cb)(const void *payload, size_t length) = NULL;
 static void (*private_on_send_cb)(bool success) = NULL;
 
-// Inicializar Spinlock en estado desbloqueado
-static portMUX_TYPE callback_mux = portMUX_INITIALIZER_UNLOCKED;
 
 /* =========================================================================
  * CALLBACKS NATIVOS DE ESP-NOW (ESP-IDF v5.3)
@@ -58,28 +56,19 @@ static void native_now_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
     }
     // Encolar O disparar callback (Exclusión mutua)
     if (data != NULL && len > 0) {
-
-        void (*temp_recv_cb)(const void *, size_t) = NULL;
-        QueueHandle_t temp_queue = NULL;
-
-        //Copiamos el puntero global al temporal dentro de la sección crítica
-        taskENTER_CRITICAL(&callback_mux);
-        temp_recv_cb = private_on_receive_cb; 
-        temp_queue = rx_packet_queue;
-        taskEXIT_CRITICAL(&callback_mux);
         
-        if (temp_recv_cb != NULL) {
+        if (private_on_receive_cb != NULL) {
             //Si hay callback definido, el paquete se procesa de forma asíncrona inmediatamente
-            temp_recv_cb(data, (size_t)len);
+            private_on_receive_cb(data, (size_t)len);
         } 
-        else if (temp_queue != NULL) {
+        else if (rx_packet_queue != NULL) {
             // Si NO hay callback, se guarda en la cola para procesamiento síncrono por polling (receive)
             EspNowPacket_t packet;
             packet.length = (len > ESP_NOW_MAX_DATA_LEN) ? ESP_NOW_MAX_DATA_LEN : len;
             memcpy(packet.data, data, packet.length);
 
             // Intentamos meter el paquete en la cola. Si está llena, se descarta.
-            if (xQueueSend(temp_queue, &packet, 0) != pdTRUE) {
+            if (xQueueSend(rx_packet_queue, &packet, 0) != pdTRUE) {
                 ESP_LOGW(TAG_ESPNOW, "¡Cola llena! Paquete descartado por saturación.");
             }
         } 
@@ -92,14 +81,10 @@ static void native_now_recv_cb(const esp_now_recv_info_t *recv_info, const uint8
 
 static void native_now_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
     if (!atomic_load(&is_initialized)) return;
-    void (*temp_send_cb)(bool) = NULL;
-    taskENTER_CRITICAL(&callback_mux);
-    temp_send_cb = private_on_send_cb;
-    taskEXIT_CRITICAL(&callback_mux);
 
-    if (temp_send_cb != NULL) {
+    if (private_on_send_cb != NULL) {
         // Traduccion de enum nativo a booleano simple (Éxito = true)
-        temp_send_cb(status == ESP_NOW_SEND_SUCCESS);
+        private_on_send_cb(status == ESP_NOW_SEND_SUCCESS);
     }
 }
 
@@ -232,45 +217,7 @@ static int espnow_impl_connect(void) {
 }
 
 static void espnow_impl_disconnect(void) {
-    if (!atomic_load(&is_initialized)) return;
-    
-    atomic_store(&is_initialized, false);
-    
-    // Quitamos el peer de la tabla si existía
-    if (esp_now_is_peer_exist(peer_mac_address)) {
-        esp_now_del_peer(peer_mac_address);
-    }
-    
-    // Desarmado en cascada del hardware y desregistro de callbacks
-    esp_now_unregister_recv_cb();
-    esp_now_unregister_send_cb();
-    esp_now_deinit();
-    
-    // Detener y desinicializar stack Wi-Fi
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    esp_event_loop_delete_default();
-    esp_netif_deinit();
-
-    QueueHandle_t queue_to_delete = NULL;
-
-
-    // Limpieza crítica de punteros a Callbacks del usuario (con Spinlock)
-    taskENTER_CRITICAL(&callback_mux);
-    private_on_receive_cb = NULL;
-    private_on_send_cb = NULL;
-    queue_to_delete = rx_packet_queue; // Pasamos el control
-    rx_packet_queue = NULL;
-    taskEXIT_CRITICAL(&callback_mux);
-
-    if (queue_to_delete != NULL) {
-        vQueueDelete(queue_to_delete);
-    }
-
-    // Resetear el estado de la telemetría
-    atomic_store(&last_received_rssi, -120);
-    
-    ESP_LOGW(TAG_ESPNOW, "Módulo desinicializado por completo. Memoria RAM liberada.");
+    return -1 // no implementada
 }
 
 static bool espnow_impl_isConnected(void) {
@@ -322,15 +269,11 @@ static int espnow_impl_receive(void *buffer, size_t max_length, uint32_t timeout
 }
 
 static void espnow_impl_onReceive(void (*callback)(const void *payload, size_t length)) {
-    taskENTER_CRITICAL(&callback_mux);
     private_on_receive_cb = callback; // Mapeo directo al main
-    taskEXIT_CRITICAL(&callback_mux);
 }
 
 static void espnow_impl_onSend(void (*callback)(bool success)) {
-    taskENTER_CRITICAL(&callback_mux);
     private_on_send_cb = callback; // Mapeo directo al main
-    taskEXIT_CRITICAL(&callback_mux);
 }
 
 static int espnow_impl_comunicationQuality(void) {
