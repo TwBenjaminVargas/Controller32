@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define ANSI_HIDE_CURSOR "\033[?25l"
 #define ANSI_RESET  "\033[0m"
 #define ANSI_GREEN  "\033[32m"
 #define ANSI_CYAN   "\033[36m"
@@ -180,14 +181,14 @@ static void render(element_t *e) {
 static int impl_initUi(void *args) {
     (void)args;
     memset(elements, 0, sizeof(elements));
-    printf(ANSI_CLEAR); 
+    printf(ANSI_CLEAR ANSI_HIDE_CURSOR); 
 
     return 0;
 }
 
 static int impl_refreshUi(void) {
 
-    printf(ANSI_HOME);
+    printf(ANSI_HOME ANSI_HIDE_CURSOR);
 
     for (int i = 0; i < MAX_ELEMENTS; i++) {
         if (elements[i].active) {

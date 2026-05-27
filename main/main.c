@@ -48,6 +48,9 @@ static const char *TAG = "MAIN";
 #define CID_BTN_A               21
 #define CID_BTN_B               22
 
+
+#define UI_JOYSTICK_DEADZONE_PERCENTAGE 12
+
 // ============================================================================
 // MÓDULOS — exportados por sus respectivos .c
 // ============================================================================
@@ -116,9 +119,9 @@ static void control_task(void *pvParameters) {
             switch (event.cid) {
                 case CID_JOY_X:  g_data.control.joy_x  = event_value;        break;
                 case CID_JOY_Y:  g_data.control.joy_y  = event_value;        break;
-                case CID_BTN_SW: g_data.control.btn_sw = (event_value != 0); break;
-                case CID_BTN_A:  g_data.control.btn_a  = (event_value != 0); break;
-                case CID_BTN_B:  g_data.control.btn_b  = (event_value != 0); break;
+                case CID_BTN_SW: g_data.control.btn_sw = !g_data.control.btn_sw; break;
+                case CID_BTN_A:  g_data.control.btn_a  = !g_data.control.btn_a; break;
+                case CID_BTN_B:  g_data.control.btn_b  = !g_data.control.btn_b; break;
                 default: break;
             }
             // Snapshot fuera del mutex: no llamar send() mientras se sostiene el lock
@@ -239,6 +242,9 @@ static void ui_task(void *pvParameters) {
         if (x_pct < -100) x_pct = -100;
         if (y_pct >  100) y_pct =  100;
         if (y_pct < -100) y_pct = -100;
+
+        if (abs(x_pct) < UI_JOYSTICK_DEADZONE_PERCENTAGE) x_pct = 0;
+        if (abs(y_pct) < UI_JOYSTICK_DEADZONE_PERCENTAGE) y_pct = 0;
 
         UI.updateBipolarProgressBar(id_joy_x,  x_pct, "");
         UI.updateBipolarProgressBar(id_joy_y,  y_pct, "");

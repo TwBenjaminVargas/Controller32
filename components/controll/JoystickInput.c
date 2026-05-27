@@ -47,7 +47,7 @@
 #define JOYSTICK_TASK_PRIO  5
 
 // Antirebote en milisegundos para los botones físicos
-#define DEBOUNCE_TIME_MS    50
+#define DEBOUNCE_TIME_MS    200
 #define DEBOUNCE_TABLE_SIZE 3
 
 // Tamaño máximo de la cola de eventos del sistema de control
