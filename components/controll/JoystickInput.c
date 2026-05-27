@@ -7,6 +7,8 @@
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_timer.h"
+#include <string.h>
+#include "esp_log.h"
 
 #include "ControllInterface.h"
 
@@ -15,8 +17,8 @@
 // ============================================================================
 
 // Ejes del Joystick (Deben ser ADC1 para no causar conflictos con el Wi-Fi)
-#define PIN_JOYSTICK_X      ADC1_CHANNEL_4 // GPIO 32
-#define PIN_JOYSTICK_Y      ADC1_CHANNEL_5 // GPIO 33
+#define PIN_JOYSTICK_X      ADC_CHANNEL_4 // GPIO 32
+#define PIN_JOYSTICK_Y      ADC_CHANNEL_5 // GPIO 33
 
 // Botones (Pines seguros con soporte de PULL-UP interno)
 #define PIN_BTN_SW          GPIO_NUM_25 // Botón al presionar el joystick
@@ -262,7 +264,7 @@ static int init_impl(void* args) {
     }
 
     // Inicializar unidad ADC1
-    adc_oneshot_unit_init_config_t init_config1 = {
+    adc_oneshot_unit_init_cfg_t init_config1 = {
         .unit_id  = ADC_UNIT_1,
         .ulp_mode = ADC_ULP_MODE_DISABLE,
     };
@@ -275,9 +277,9 @@ static int init_impl(void* args) {
 
     // Configurar canales — ADC_ATTEN_DB_11 es la constante oficial en ESP-IDF v5
     // para el rango máximo de 0–3.9V. DB_12 no existe como constante estándar.
-    adc_oneshot_chan_config_t chan_cfg = {
+    adc_oneshot_chan_cfg_t chan_cfg = {
         .bitwidth = ADC_BITWIDTH_12,
-        .atten    = ADC_ATTEN_DB_11,  // ← corrección: DB_11 es el valor correcto
+        .atten    = ADC_ATTEN_DB_12,
     };
 
     if (adc_oneshot_config_channel(adc1_handle, PIN_JOYSTICK_X, &chan_cfg) != ESP_OK) {

@@ -52,7 +52,7 @@ static void (*private_on_send_cb)(bool success) = NULL;
 static void native_now_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
     if (!atomic_load(&is_initialized)) return;
     if (recv_info != NULL && recv_info->rx_ctrl != NULL) {
-        atomic_store(&last_received_rssi, recv_info->rx_ctrl->rssi)
+        atomic_store(&last_received_rssi, recv_info->rx_ctrl->rssi);
     }
     // Encolar O disparar callback (Exclusión mutua)
     if (data != NULL && len > 0) {
@@ -217,7 +217,7 @@ static int espnow_impl_connect(void) {
 }
 
 static void espnow_impl_disconnect(void) {
-    return -1 // no implementada
+    return; // no implementada
 }
 
 static bool espnow_impl_isConnected(void) {
