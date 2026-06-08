@@ -15,9 +15,9 @@
 #include <stdatomic.h>
 
 
-#define ESP_NOW_CHANNEL 1 // Canal Wi-Fi para ESP-NOW  (1-13 = canal específico)
+#define ESP_NOW_CHANNEL 6 // Canal Wi-Fi para ESP-NOW  (1-13 = canal específico)
 #define MAX_QUEUE_ELEMENTS   10 // Tamaño máximo de la cola para eventos entrantes
-#define DEST_MAC_ADDRESS  {0x24, 0x0A, 0xC4, 0x12, 0x34, 0x56} //MAC de destino
+#define DEST_MAC_ADDRESS  {0xB4, 0x8A, 0x0A, 0xB2, 0x97, 0x9C} //MAC de destino
 
 #define RSSI_MIN (-95)
 #define RSSI_MAX (-30)
@@ -147,6 +147,12 @@ static int espnow_impl_init(void *args) {
         esp_wifi_start() != ESP_OK) {
         ESP_LOGE(TAG_ESPNOW, "Error al configurar o encender la radio Wi-Fi física.");
         goto err_clean_wifi;
+    }
+    
+    ret = esp_wifi_set_channel(ESP_NOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG_ESPNOW, "Error al fijar el canal Wi-Fi %d: %s", ESP_NOW_CHANNEL, esp_err_to_name(ret));
+        goto err_stop_wifi;
     }
 
     // Inicializar el protocolo ESP-NOW

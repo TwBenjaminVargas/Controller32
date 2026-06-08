@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 
 #include "CommunicationInterface.h"
 #include "ControllInterface.h"
@@ -49,7 +50,7 @@ static const char *TAG = "MAIN";
 #define CID_BTN_B               22
 
 
-#define UI_JOYSTICK_DEADZONE_PERCENTAGE 12
+#define UI_JOYSTICK_DEADZONE_PERCENTAGE 13
 
 // ============================================================================
 // MÓDULOS — exportados por sus respectivos .c
@@ -74,12 +75,13 @@ typedef struct {
 
 // Paquete de telemetría recibido desde el robot
 typedef struct {
-    int battery_level;  // Porcentaje 0-100
-    int speed;          // Unidad definida por el robot
+    int  aire;       // MQ135: valor ADC crudo (0-4095)
+    long distFrente; // HC-SR04 frente (cm)
+    long distIzq;    // HC-SR04 izquierda (cm)
+    long distDer;    // HC-SR04 derecha (cm)
 } RobotTelemetry_t;
 
 // Estructura central compartida entre tareas.
-// Todo acceso debe hacerse bajo g_data_mutex.
 typedef struct {
     ControlPacket_t  control;
     RobotTelemetry_t robot;
@@ -181,6 +183,14 @@ static void telemetry_task(void *pvParameters) {
     TickType_t       last_wake = xTaskGetTickCount();
     const TickType_t period    = pdMS_TO_TICKS(TELEMETRY_PERIOD_MS);
 
+    uint8_t mac[6];
+    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) == ESP_OK) {
+        ESP_LOGI(TAG, "Dirección MAC del ESP32: %02X:%02X:%02X:%02X:%02X:%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    } else {
+        ESP_LOGE(TAG, "No se pudo leer la dirección MAC");
+    }
+
     while (1) {
         // Duerme exactamente el período — 0% CPU durante la espera
         vTaskDelayUntil(&last_wake, period);
@@ -194,6 +204,8 @@ static void telemetry_task(void *pvParameters) {
         }
 
         ESP_LOGI(TAG, "Calidad de señal: %d%%", quality);
+        ESP_LOGI(TAG, "Dirección MAC del ESP32: %02X:%02X:%02X:%02X:%02X:%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     }
 }
 
@@ -209,20 +221,41 @@ static void ui_task(void *pvParameters) {
     const TickType_t period    = pdMS_TO_TICKS(UI_REFRESH_PERIOD_MS);
     SharedData_t     snap      = {0};
 
+    // Buffers intermedios para la concatenación de los strings
+    char buf_joy_x[32];
+    char buf_joy_y[32];
+    char buf_btn_a[32];
+    char buf_btn_b[32];
+    char buf_btn_sw[32];
+    char buf_signal[32];
+    char buf_aire[32];
+    char buf_dist_frente[32];
+    char buf_dist_izq[32];
+    char buf_dist_der[32];
+
     // Construcción del layout — una sola vez antes del loop
     UI.addTitle("ESP32 JOYSTICK CONTROLLER");
 
-    UI.addSubtitle("Control Inputs");
-    ui_eid_t id_joy_x  = UI.addBipolarProgressBar("Joystick X",  0, "ADC");
+    UI.addSubtitle("Control Inputs(RAW)");
+    ui_eid_t id_joy_x  = UI.addTextLine("");
+    ui_eid_t id_joy_y  = UI.addTextLine("");
+    ui_eid_t id_btn_a  = UI.addTextLine("");
+    ui_eid_t id_btn_b  = UI.addTextLine("");
+    ui_eid_t id_btn_sw = UI.addTextLine("");
+
+    /*ui_eid_t id_joy_x  = UI.addBipolarProgressBar("Joystick X",  0, "ADC");
     ui_eid_t id_joy_y  = UI.addBipolarProgressBar("Joystick Y",  0, "ADC");
     ui_eid_t id_btn_a  = UI.addStateIndicator("Button A",  false);
     ui_eid_t id_btn_b  = UI.addStateIndicator("Button B",  false);
     ui_eid_t id_btn_sw = UI.addStateIndicator("Button SW", false);
-
+    */
     UI.addSubtitle("Link & Robot Status");
-    ui_eid_t id_signal  = UI.addProgressBar("Signal Quality", 0, "Q");
-    ui_eid_t id_battery = UI.addProgressBar("Robot Battery",  0, "%");
-    ui_eid_t id_speed   = UI.addProgressBar("Robot Speed",    0, "RPM");
+    //ui_eid_t id_signal  = UI.addProgressBar("Signal Quality", 0, "Q");
+    ui_eid_t id_signal      = UI.addTextLine("");
+    ui_eid_t id_aire        = UI.addTextLine("");
+    ui_eid_t id_dist_frente = UI.addTextLine("");
+    ui_eid_t id_dist_izq    = UI.addTextLine("");
+    ui_eid_t id_dist_der    = UI.addTextLine("");
 
     while (1) {
         vTaskDelayUntil(&last_wake, period);
@@ -232,7 +265,7 @@ static void ui_task(void *pvParameters) {
             snap = g_data;
             xSemaphoreGive(g_data_mutex);
         }
-
+        /*
         // Mapeo ADC crudo (0-4095) a bipolar (-100 a +100), centro ≈ 2048
         int x_pct = ((snap.control.joy_x - 2048) * 100) / 2048;
         int y_pct = ((snap.control.joy_y - 2048) * 100) / 2048;
@@ -246,14 +279,39 @@ static void ui_task(void *pvParameters) {
         if (abs(x_pct) < UI_JOYSTICK_DEADZONE_PERCENTAGE) x_pct = 0;
         if (abs(y_pct) < UI_JOYSTICK_DEADZONE_PERCENTAGE) y_pct = 0;
 
-        UI.updateBipolarProgressBar(id_joy_x,  x_pct, "");
-        UI.updateBipolarProgressBar(id_joy_y,  y_pct, "");
+        UI.updateBipolarProgressBar(id_joy_x,  snap.control.joy_x, "");
+        UI.updateBipolarProgressBar(id_joy_y,  snap.control.joy_y, "");
         UI.updateStateIndicator(id_btn_a,  snap.control.btn_a);
         UI.updateStateIndicator(id_btn_b,  snap.control.btn_b);
         UI.updateStateIndicator(id_btn_sw, snap.control.btn_sw);
         UI.updateProgressBar(id_signal,  snap.signal_quality,      "Q");
-        UI.updateProgressBar(id_battery, snap.robot.battery_level, "%");
-        UI.updateProgressBar(id_speed,   snap.robot.speed,         "RPM");
+        */
+
+        snprintf(buf_joy_x,  sizeof(buf_joy_x),  "Joystick X: %d", snap.control.joy_x);
+        snprintf(buf_joy_y,  sizeof(buf_joy_y),  "Joystick Y: %d", snap.control.joy_y);
+        snprintf(buf_btn_a,  sizeof(buf_btn_a),  "Button A:   %s", snap.control.btn_a ? "PRESSED" : "IDLE");
+        snprintf(buf_btn_b,  sizeof(buf_btn_b),  "Button B:   %s", snap.control.btn_b ? "PRESSED" : "IDLE");
+        snprintf(buf_btn_sw, sizeof(buf_btn_sw), "Button SW:  %s", snap.control.btn_sw ? "PRESSED" : "IDLE");
+
+        // 3. Concatenar valores remotos (Telemetría del Robot)
+        snprintf(buf_signal,      sizeof(buf_signal),      "Signal Quality: %d%%",  snap.signal_quality);
+        snprintf(buf_aire,        sizeof(buf_aire),        "Calidad Aire (MQ135): %d", snap.robot.aire);
+        snprintf(buf_dist_frente, sizeof(buf_dist_frente), "Dist. Frente:  %ld cm", snap.robot.distFrente);
+        snprintf(buf_dist_izq,    sizeof(buf_dist_izq),    "Dist. Izquierda: %ld cm", snap.robot.distIzq);
+        snprintf(buf_dist_der,    sizeof(buf_dist_der),    "Dist. Derecha:   %ld cm", snap.robot.distDer);
+
+        // 4. Actualizar las líneas de texto en la interfaz
+        UI.updateTextLine(id_joy_x,  buf_joy_x);
+        UI.updateTextLine(id_joy_y,  buf_joy_y);
+        UI.updateTextLine(id_btn_a,  buf_btn_a);
+        UI.updateTextLine(id_btn_b,  buf_btn_b);
+        UI.updateTextLine(id_btn_sw, buf_btn_sw);
+        
+        UI.updateTextLine(id_signal,      buf_signal);
+        UI.updateTextLine(id_aire,        buf_aire);
+        UI.updateTextLine(id_dist_frente, buf_dist_frente);
+        UI.updateTextLine(id_dist_izq,    buf_dist_izq);
+        UI.updateTextLine(id_dist_der,    buf_dist_der);
 
         UI.refreshUi();
     }

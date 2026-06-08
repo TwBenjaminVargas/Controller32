@@ -33,13 +33,13 @@
 // Afecta a la CPU: 100Hz significa que la tarea del joystick despertará
 // 100 veces por segundo. Como usamos vTaskDelayUntil, la CPU entra en 
 // reposo el resto del tiempo (no hay busy wait, 0% CPU en espera).
-#define JOYSTICK_FREQ_HZ    100 
+#define JOYSTICK_FREQ_HZ    35//! Si subimos de 100 muere
 
 // Sensibilidad (Deadzone/Banda Muerta). Rango del ADC: 0 a 4095.
 // Afecta a la CPU: Un umbral más alto reduce el envío de eventos "basura" 
 // por ruido eléctrico, disminuyendo enormemente los cambios de contexto (context switch) 
 // hacia la tarea principal que escucha la cola.
-#define JOYSTICK_DEADZONE   150 
+#define JOYSTICK_DEADZONE   100 //* con 10 anda joia pero problemas en send
 
 // Prioridad del hilo del Joystick.
 // En FreeRTOS, números altos = mayor prioridad. 
@@ -51,7 +51,7 @@
 #define DEBOUNCE_TABLE_SIZE 3
 
 // Tamaño máximo de la cola de eventos del sistema de control
-#define CONTROL_QUEUE_LEN   20
+#define CONTROL_QUEUE_LEN   2
 
 // ============================================================================
 // ESTRUCTURAS INTERNAS Y VARIABLES GLOBALES
