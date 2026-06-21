@@ -203,9 +203,9 @@ static void telemetry_task(void *pvParameters) {
             xSemaphoreGive(g_data_mutex);
         }
 
-        ESP_LOGI(TAG, "Calidad de señal: %d%%", quality);
+        /*ESP_LOGI(TAG, "Calidad de señal: %d%%", quality);
         ESP_LOGI(TAG, "Dirección MAC del ESP32: %02X:%02X:%02X:%02X:%02X:%02X",
-                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);*/
     }
 }
 
@@ -222,11 +222,13 @@ static void ui_task(void *pvParameters) {
     SharedData_t     snap      = {0};
 
     // Buffers intermedios para la concatenación de los strings
+    /*
     char buf_joy_x[32];
     char buf_joy_y[32];
     char buf_btn_a[32];
     char buf_btn_b[32];
     char buf_btn_sw[32];
+    */
     char buf_signal[32];
     char buf_aire[32];
     char buf_dist_frente[32];
@@ -237,18 +239,20 @@ static void ui_task(void *pvParameters) {
     UI.addTitle("ESP32 JOYSTICK CONTROLLER");
 
     UI.addSubtitle("Control Inputs(RAW)");
+    /*
     ui_eid_t id_joy_x  = UI.addTextLine("");
     ui_eid_t id_joy_y  = UI.addTextLine("");
     ui_eid_t id_btn_a  = UI.addTextLine("");
     ui_eid_t id_btn_b  = UI.addTextLine("");
     ui_eid_t id_btn_sw = UI.addTextLine("");
-
-    /*ui_eid_t id_joy_x  = UI.addBipolarProgressBar("Joystick X",  0, "ADC");
-    ui_eid_t id_joy_y  = UI.addBipolarProgressBar("Joystick Y",  0, "ADC");
-    ui_eid_t id_btn_a  = UI.addStateIndicator("Button A",  false);
-    ui_eid_t id_btn_b  = UI.addStateIndicator("Button B",  false);
-    ui_eid_t id_btn_sw = UI.addStateIndicator("Button SW", false);
     */
+
+    ui_eid_t id_joy_x  = UI.addBipolarProgressBar("Joystick X",  0, "ADC");
+    ui_eid_t id_joy_y  = UI.addBipolarProgressBar("Joystick Y",  0, "ADC");
+    //ui_eid_t id_btn_a  = UI.addStateIndicator("Button A",  false);
+    //ui_eid_t id_btn_b  = UI.addStateIndicator("Button B",  false);
+    ui_eid_t id_btn_sw = UI.addStateIndicator("Button SW", false);
+    
     UI.addSubtitle("Link & Robot Status");
     //ui_eid_t id_signal  = UI.addProgressBar("Signal Quality", 0, "Q");
     ui_eid_t id_signal      = UI.addTextLine("");
@@ -260,12 +264,12 @@ static void ui_task(void *pvParameters) {
     while (1) {
         vTaskDelayUntil(&last_wake, period);
 
-        // Snapshot rápido bajo mutex — el render ocurre fuera del lock
+        // Snapshot rápido bajo mutex el render ocurre fuera del lock
         if (xSemaphoreTake(g_data_mutex, portMAX_DELAY) == pdTRUE) {
             snap = g_data;
             xSemaphoreGive(g_data_mutex);
         }
-        /*
+
         // Mapeo ADC crudo (0-4095) a bipolar (-100 a +100), centro ≈ 2048
         int x_pct = ((snap.control.joy_x - 2048) * 100) / 2048;
         int y_pct = ((snap.control.joy_y - 2048) * 100) / 2048;
@@ -279,33 +283,36 @@ static void ui_task(void *pvParameters) {
         if (abs(x_pct) < UI_JOYSTICK_DEADZONE_PERCENTAGE) x_pct = 0;
         if (abs(y_pct) < UI_JOYSTICK_DEADZONE_PERCENTAGE) y_pct = 0;
 
-        UI.updateBipolarProgressBar(id_joy_x,  snap.control.joy_x, "");
-        UI.updateBipolarProgressBar(id_joy_y,  snap.control.joy_y, "");
-        UI.updateStateIndicator(id_btn_a,  snap.control.btn_a);
-        UI.updateStateIndicator(id_btn_b,  snap.control.btn_b);
+        UI.updateBipolarProgressBar(id_joy_x,  x_pct, "");
+        UI.updateBipolarProgressBar(id_joy_y,  y_pct, "");
+        //UI.updateStateIndicator(id_btn_a,  snap.control.btn_a);
+        //UI.updateStateIndicator(id_btn_b,  snap.control.btn_b);
         UI.updateStateIndicator(id_btn_sw, snap.control.btn_sw);
-        UI.updateProgressBar(id_signal,  snap.signal_quality,      "Q");
-        */
-
+        //UI.updateProgressBar(id_signal,  snap.signal_quality,      "Q");
+       
+        /*
         snprintf(buf_joy_x,  sizeof(buf_joy_x),  "Joystick X: %d", snap.control.joy_x);
         snprintf(buf_joy_y,  sizeof(buf_joy_y),  "Joystick Y: %d", snap.control.joy_y);
         snprintf(buf_btn_a,  sizeof(buf_btn_a),  "Button A:   %s", snap.control.btn_a ? "PRESSED" : "IDLE");
         snprintf(buf_btn_b,  sizeof(buf_btn_b),  "Button B:   %s", snap.control.btn_b ? "PRESSED" : "IDLE");
         snprintf(buf_btn_sw, sizeof(buf_btn_sw), "Button SW:  %s", snap.control.btn_sw ? "PRESSED" : "IDLE");
+        */
 
-        // 3. Concatenar valores remotos (Telemetría del Robot)
+        // Concatenar valores remotos (Telemetría del Robot)
         snprintf(buf_signal,      sizeof(buf_signal),      "Signal Quality: %d%%",  snap.signal_quality);
         snprintf(buf_aire,        sizeof(buf_aire),        "Calidad Aire (MQ135): %d", snap.robot.aire);
         snprintf(buf_dist_frente, sizeof(buf_dist_frente), "Dist. Frente:  %ld cm", snap.robot.distFrente);
         snprintf(buf_dist_izq,    sizeof(buf_dist_izq),    "Dist. Izquierda: %ld cm", snap.robot.distIzq);
         snprintf(buf_dist_der,    sizeof(buf_dist_der),    "Dist. Derecha:   %ld cm", snap.robot.distDer);
 
-        // 4. Actualizar las líneas de texto en la interfaz
+        // Actualizar las líneas de texto en la interfaz
+        /*
         UI.updateTextLine(id_joy_x,  buf_joy_x);
         UI.updateTextLine(id_joy_y,  buf_joy_y);
         UI.updateTextLine(id_btn_a,  buf_btn_a);
         UI.updateTextLine(id_btn_b,  buf_btn_b);
         UI.updateTextLine(id_btn_sw, buf_btn_sw);
+        */
         
         UI.updateTextLine(id_signal,      buf_signal);
         UI.updateTextLine(id_aire,        buf_aire);
@@ -346,7 +353,7 @@ void app_main(void) {
     // UI
     UI.initUi(NULL);
 
-    // 5. Creación de tareas
+    // Creación de tareas
     BaseType_t ok = pdPASS;
     ok &= xTaskCreate(control_task,       "ctrl",  STACK_CONTROL,   NULL, TASK_PRIO_CONTROL,   NULL);
     ok &= xTaskCreate(incoming_data_task, "rx",    STACK_INCOMING,  NULL, TASK_PRIO_INCOMING,  NULL);

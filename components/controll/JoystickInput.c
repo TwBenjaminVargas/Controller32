@@ -33,13 +33,13 @@
 // Afecta a la CPU: 100Hz significa que la tarea del joystick despertará
 // 100 veces por segundo. Como usamos vTaskDelayUntil, la CPU entra en 
 // reposo el resto del tiempo (no hay busy wait, 0% CPU en espera).
-#define JOYSTICK_FREQ_HZ    35//! Si subimos de 100 muere
+#define JOYSTICK_FREQ_HZ    35
 
 // Sensibilidad (Deadzone/Banda Muerta). Rango del ADC: 0 a 4095.
 // Afecta a la CPU: Un umbral más alto reduce el envío de eventos "basura" 
 // por ruido eléctrico, disminuyendo enormemente los cambios de contexto (context switch) 
 // hacia la tarea principal que escucha la cola.
-#define JOYSTICK_DEADZONE   100 //* con 10 anda joia pero problemas en send
+#define JOYSTICK_DEADZONE   100 
 
 // Prioridad del hilo del Joystick.
 // En FreeRTOS, números altos = mayor prioridad. 
@@ -77,8 +77,6 @@ typedef struct {
 } InternalEvent;
 
 static QueueHandle_t event_queue = NULL;
-
-// Mux de FreeRTOS para control de regiones críticas (Spinlock multicore seguro para ISR)
 
 static adc_oneshot_unit_handle_t adc1_handle;
 static bool s_initialized = false;
@@ -189,8 +187,8 @@ static int64_t s_last_processed_us[DEBOUNCE_TABLE_SIZE] = {0};
 static bool wait_event_impl(ControllEvent *event, void *buffer, uint32_t timeout_ms) {
     if (!event_queue || !event) return false;
 
-    // timeout_ms == 0 → esperar indefinidamente (portMAX_DELAY)
-    // Cualquier otro valor → convertir a ticks de FreeRTOS
+    // timeout_ms == 0 esperar indefinidamente (portMAX_DELAY)
+    // Cualquier otro valor convertir a ticks de FreeRTOS
     TickType_t ticks_to_wait = (timeout_ms == 0)
                                ? portMAX_DELAY
                                : pdMS_TO_TICKS(timeout_ms);
